@@ -1,56 +1,108 @@
 const maxTravel = 50;
-const paperWidth = 1000;
-const paperHeight = 500;
-const maxPointDistance = 100;
-const startingPoints = 30;
-const pointDiameter = 3;
-const pointSpeed = 6000; // randomIntFromInterval(4000,6000);
+const paperWidth = 1200;
+const paperHeight = 600;
+const startingPoints = 20;
+const pointDiameter = 2;
+const pointSpeed = 7000; // randomIntFromInterval(4000,6000);
+const maxConnectingDistance = paperWidth * paperHeight * 0.0005;
 
 var s = Snap(paperWidth,paperHeight);
 var lines = [];
 var points = [];
-var foo = false;
+var inittedConnect = false;
 
 function newLine(x1, y1, x2, y2, color) {
-    return s.line(x1, y1, x2, y2).attr({strokeWidth:1,stroke:color ? color : 'white', strokeOpacity:"0.5"});
+    return s.line(x1, y1, x2, y2).attr({strokeWidth:1,stroke:color ? color : 'white', strokeOpacity:"0"});
 }
 
-function newPoint(x, y, d) {
-    return s.circle(x, y, d).attr({fill:"white", fillOpacity:"1"})
+function newPoint(x, y) {
+    return s.circle(x, y, pointDiameter).attr({fill:"white", fillOpacity:"1"})
 }
 
 function generatePoints() {
     for (let i = 0; i < startingPoints; i++) {
         let randX = randomIntFromInterval(paperWidth, 10);
         let randY = randomIntFromInterval(paperHeight, 10);
-        points.push( newPoint(randX, randY, pointDiameter) )
+        let generatedPoint = newPoint(randX, randY)
+        generatedPoint.startingPoints = {x: randX, y: randY};
+        generatedPoint.dest = {x: 0, y: 0};
+        points.push( generatedPoint )
     }
 }
-generatePoints();
 
 function connectPoints() {
     for (let i = 0; i < points.length; i++) {
         points[i].lines = points[i].lines ? points[i].lines : [];
-        let pointX = points[i].node.cx.baseVal.value;
-        let pointY = points[i].node.cy.baseVal.value;
+        let pointX = points[i].node.cx.animVal.value;
+        let pointY = points[i].node.cy.animVal.value;
         for (let q = i + 1; q < points.length; q++) {
             points[q].lines = points[q].lines ? points[q].lines : [];
-            let comparePointX = points[q].node.cx.baseVal.value;
-            let comparePointY = points[q].node.cy.baseVal.value;
+            let comparePointX = points[q].node.cx.animVal.value;
+            let comparePointY = points[q].node.cy.animVal.value;
             let distance = calculateDistance(pointX, pointY, comparePointX, comparePointY)
-            if (distance < maxPointDistance) {
-                var lineIndex = lines.push( newLine(pointX, pointY, comparePointX, comparePointY, foo ? 'white' : 'red') )
-                points[i].lines.push({pos: 1, connectsTo: q, el: lines[lineIndex-1]})
-                points[q].lines.push({pos: 2, connectsTo: i, el: lines[lineIndex-1]})
+            if (distance < maxConnectingDistance) {
+                let lineExists = false;
+                for (const line of points[i].lines) {
+                    if (line.connectsTo === q) {
+                        lineExists = true;
+                    }
+                }
+                if (!lineExists) {
+
+                    let x1 = points[i].node.cx.animVal.value;
+                    let y1 = points[i].node.cy.animVal.value;
+                    let x2 = points[q].node.cx.animVal.value;
+                    let y2 = points[q].node.cy.animVal.value
+
+                    const lineIndex = lines.push( newLine(x1, y1, x2, y2, inittedConnect ? 'white' : 'white') )
+
+                    const lineEl = lines[lineIndex-1];
+                    const pointAnim = points[i].anims[Object.keys(points[i].anims)[0]]
+                    const animationTimeRemaining = pointAnim ? ((1 - pointAnim.status()) * pointSpeed) : pointSpeed;
+                    lineEl.animate(
+                        {
+                            x1: points[i].dest.x,
+                            y1: points[i].dest.y,
+                            x2: points[q].dest.x,
+                            y2: points[q].dest.y
+                        },
+                        animationTimeRemaining,
+                        mina.linear,
+                        () => {}
+                    )
+                    lineEl.animate(
+                        {
+                            strokeOpacity:"0.3"
+                        },
+                        pointSpeed/3,
+                        mina.linear,
+                        () => {}
+                    )
+                    points[i].lines.push({pos: 1, connectsTo: q, lineId: lineEl.id, el: lines[lineIndex-1]})
+                    points[q].lines.push({pos: 2, connectsTo: i, lineId: lineEl.id, el: lineEl})
+                }
+            } else {
+                for (let [index, line] of points[i].lines.entries()) {
+                    if (line.connectsTo === q) {
+                        line.el.animate(
+                            {strokeOpacity:"0"},
+                            750,
+                            mina.linear,
+                            () => { line.el.remove() }
+                        )
+                        points[i].lines.splice(index, 1);
+                    }
+                }
+                for (let [index, line] of points[q].lines.entries()) {
+
+                    if (line.connectsTo === i) {
+                        points[q].lines.splice(index, 1);
+                    }
+                }
             }
         }
     }
-    foo = true;
-}
-connectPoints()
-
-window.clearSnap = function() {
-    s.clear();
+    inittedConnect = true;
 }
 
 function calculateDistance(x1, y1, x2, y2) {
@@ -61,21 +113,34 @@ function randomIntFromInterval(min, max) {
     return Math.floor(Math.random() * (max - min + 1) + min);
 }
 
-function getNewDistanceToTravel(start) {
+function getNearbyCoordinate(start, axis) {
     let negOrPos = Math.random() < 0.5 ? -1 : 1;
     let rand = randomIntFromInterval(maxTravel, 10)
-    return start + (negOrPos * rand);
+    let coord = start + (negOrPos * rand)
+    if (axis === 'x') {
+        if (coord > paperWidth) {
+            coord = coord - maxTravel;
+        } else if (coord < 0) {
+            coord = coord + maxTravel;
+        }
+    }
+    else {
+        if (coord > paperHeight) {
+            coord = coord - maxTravel;
+        } else if (coord < 0) {
+            coord = coord + maxTravel;
+        }
+    }
+    return coord;
 }
 
-
-
-function runAnim() {
+function runAnimation() {
     for (let point of points) {
-        const startX = point.node.cx.baseVal.value;
-        const startY = point.node.cy.baseVal.value;
-        // each point should randomly pick which direction it should go next
-        const toX = getNewDistanceToTravel(startX);
-        const toY = getNewDistanceToTravel(startY);
+        const startX = point.startingPoints.x;
+        const startY = point.startingPoints.y;
+        const toX = getNearbyCoordinate(startX, 'x');
+        const toY = getNearbyCoordinate(startY, 'y');
+        point.dest = {x: toX, y: toY};
         point.animate(
             {cx: toX, cy: toY},
             pointSpeed,
@@ -90,8 +155,11 @@ function runAnim() {
         }
     }
     return;
-
 }
+
+///////////////////////////////////////////////
+// INITTING ///////////////////////////////////
+///////////////////////////////////////////////
 
 var asyncLoop = function(o){
     var i = -1;
@@ -103,33 +171,107 @@ var asyncLoop = function(o){
         }
         o.functionToLoop(loop, i);
     }
-    loop();//init
+    loop();
 }
 
-runAnim();
-asyncLoop({
-    length : 10000,
-    functionToLoop : function(loop, i){
-        setTimeout(function(){
-            console.log('running loop')
-            runAnim();
-            loop();
-        }, pointSpeed);
-    },
-    callback : function(){
-        document.write('All done!');
-    }
-});
+function loopRunAnim() {
+    asyncLoop({
+        length: 10000,
+        functionToLoop: function(loop, i){
+            setTimeout(function(){
+                runAnimation();
+                loop();
+            }, pointSpeed);
+        },
+        callback(){}
+    });
+}
 
-asyncLoop({
-    length : 10000,
-    functionToLoop : function(loop, i){
-        setTimeout(function(){
-            connectPoints()
-            loop();
-        }, pointSpeed/3);
-    },
-    callback : function(){
-        document.write('All done!');
+function loopConnectPoints() {
+    asyncLoop({
+        length: 10000,
+        functionToLoop: function(loop, i){
+            setTimeout(function(){
+                connectPoints()
+                loop();
+            }, pointSpeed/5);
+        },
+        callback(){}
+    });
+}
+
+function throttle(fn, threshhold, scope) {
+  threshhold || (threshhold = 250);
+  var last,
+      deferTimer;
+  return function () {
+    var context = scope || this;
+
+    var now = +new Date,
+        args = arguments;
+    if (last && now < last + threshhold) {
+      // hold on to it
+      clearTimeout(deferTimer);
+      deferTimer = setTimeout(function () {
+        last = now;
+        fn.apply(context, args);
+      }, threshhold);
+    } else {
+      last = now;
+      fn.apply(context, args);
     }
-});
+  };
+}
+
+function createMousePoint(x, y) {
+    let generatedPoint = newPoint(x, y);
+    generatedPoint.startingPoints = {x, y};
+    generatedPoint.dest = {x, y};
+    generatedPoint.isMouse = true;
+    points.push( generatedPoint )
+}
+
+function destroyMousePoint() {
+    points[points.length-1].remove();
+    points.pop();
+}
+
+var docReadyCallback = function(){
+    generatePoints();
+    connectPoints()
+    runAnimation();
+    loopConnectPoints();
+    loopRunAnim()
+
+    // s.mousemove(throttle(function(event) {
+    //     createMousePoint(event.offsetX, event.offsetY);
+    // }, 300))
+    // console.log('s: ', s)
+    s.node.addEventListener("mouseenter", function(event) {
+        createMousePoint(event.offsetX, event.offsetY);
+    })
+    s.node.addEventListener("mouseleave", function(event) {
+        destroyMousePoint();
+    })
+
+    // s.mousemove(throttle(function(event) {
+    //     createMousePoint(event.offsetX, event.offsetY);
+    // }, 300))
+
+    // s.unmouseout(function(event) {
+    //     console.log('unmouseout.')
+    // })
+    // s.mouseout(function(event) {
+    //     console.log('mouseout.')
+    // })
+};
+
+if ( document.readyState === "complete" || (document.readyState !== "loading" && !document.documentElement.doScroll)) {
+  docReadyCallback();
+} else {
+  document.addEventListener("DOMContentLoaded", docReadyCallback);
+}
+
+window.clearSnap = function() {
+    s.clear();
+}

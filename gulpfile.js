@@ -1,13 +1,16 @@
 var gulp        = require('gulp');
 var browserSync = require('browser-sync').create();
-var babel = require('gulp-babel');
+var babel       = require('gulp-babel');
+var sourcemaps  = require('gulp-sourcemaps');
 
 // process JS files and return the stream.
 gulp.task('js', function () {
     return gulp.src('js/*.js')
+        .pipe(sourcemaps.init())
         .pipe(babel({
             presets: ['es2015']
         }))
+        .pipe(sourcemaps.write('.'))
         .pipe(gulp.dest('dist'));
 });
 
