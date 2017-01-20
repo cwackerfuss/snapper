@@ -8,17 +8,30 @@ var maxTravel = 50;
 var paperWidth = 1200;
 var paperHeight = 600;
 var startingPoints = 20;
-var pointDiameter = 2;
+var pointDiameter = 0;
 var pointSpeed = 7000; // randomIntFromInterval(4000,6000);
 var maxConnectingDistance = paperWidth * paperHeight * 0.0005;
+var rgb1 = [237, 65, 149];
+var rgb2 = [226, 44, 40];
 
 var s = Snap(paperWidth, paperHeight);
 var lines = [];
 var points = [];
-var inittedConnect = false;
 
-function newLine(x1, y1, x2, y2, color) {
-    return s.line(x1, y1, x2, y2).attr({ strokeWidth: 1, stroke: color ? color : 'white', strokeOpacity: "0" });
+function newLine(x1, y1, x2, y2) {
+    var x1Position = x1 / paperWidth;
+    return s.line(x1, y1, x2, y2).attr({ strokeWidth: 2, stroke: getIntermediaryRgb(x1Position), strokeOpacity: "0" });
+}
+
+function getIntermediaryRgb(percent) {
+    var rDiff = rgb1[0] > rgb2[0] ? rgb1[0] - rgb2[0] : rgb2[0] - rgb1[0];
+    var gDiff = rgb1[1] > rgb2[1] ? rgb1[1] - rgb2[1] : rgb2[1] - rgb1[1];
+    var bDiff = rgb1[2] > rgb2[2] ? rgb1[2] - rgb2[2] : rgb2[2] - rgb1[2];
+    var rNew = rgb1[0] > rgb2[0] ? rgb1[0] - rDiff * percent : rgb1[0] + rDiff * percent;
+    var gNew = rgb1[1] > rgb2[1] ? rgb1[1] - gDiff * percent : rgb1[1] + gDiff * percent;
+    var bNew = rgb1[2] > rgb2[2] ? rgb1[2] - bDiff * percent : rgb1[2] + bDiff * percent;
+    var newRgb = "rgb(" + rNew + "," + gNew + "," + bNew + ")";
+    return newRgb;
 }
 
 function newPoint(x, y) {
@@ -82,7 +95,7 @@ function connectPoints() {
                     var x2 = points[q].node.cx.animVal.value;
                     var y2 = points[q].node.cy.animVal.value;
 
-                    var lineIndex = lines.push(newLine(x1, y1, x2, y2, inittedConnect ? 'white' : 'white'));
+                    var lineIndex = lines.push(newLine(x1, y1, x2, y2));
 
                     var lineEl = lines[lineIndex - 1];
                     var pointAnim = points[i].anims[Object.keys(points[i].anims)[0]];
@@ -167,7 +180,6 @@ function connectPoints() {
             }
         }
     }
-    inittedConnect = true;
 }
 
 function calculateDistance(x1, y1, x2, y2) {

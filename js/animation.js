@@ -2,21 +2,34 @@ const maxTravel = 50;
 const paperWidth = 1200;
 const paperHeight = 600;
 const startingPoints = 20;
-const pointDiameter = 2;
+const pointDiameter = 0;
 const pointSpeed = 7000; // randomIntFromInterval(4000,6000);
 const maxConnectingDistance = paperWidth * paperHeight * 0.0005;
+const rgb1 = [237,65,149];
+const rgb2 = [226,44,40];
 
 var s = Snap(paperWidth,paperHeight);
 var lines = [];
 var points = [];
-var inittedConnect = false;
 
-function newLine(x1, y1, x2, y2, color) {
-    return s.line(x1, y1, x2, y2).attr({strokeWidth:1,stroke:color ? color : 'white', strokeOpacity:"0"});
+function newLine(x1, y1, x2, y2) {
+    let x1Position = x1 / paperWidth;
+    return s.line(x1, y1, x2, y2).attr({strokeWidth:2,stroke: getIntermediaryRgb(x1Position), strokeOpacity:"0"});
 }
 
 function newPoint(x, y) {
     return s.circle(x, y, pointDiameter).attr({fill:"white", fillOpacity:"1"})
+}
+
+function getIntermediaryRgb(percent) {
+    let rDiff = rgb1[0] > rgb2[0] ? rgb1[0] - rgb2[0] : rgb2[0] - rgb1[0];
+    let gDiff = rgb1[1] > rgb2[1] ? rgb1[1] - rgb2[1] : rgb2[1] - rgb1[1];
+    let bDiff = rgb1[2] > rgb2[2] ? rgb1[2] - rgb2[2] : rgb2[2] - rgb1[2];
+    let rNew = rgb1[0] > rgb2[0] ? (rgb1[0] - (rDiff * percent)) : (rgb1[0] + (rDiff * percent))
+    let gNew = rgb1[1] > rgb2[1] ? (rgb1[1] - (gDiff * percent)) : (rgb1[1] + (gDiff * percent))
+    let bNew = rgb1[2] > rgb2[2] ? (rgb1[2] - (bDiff * percent)) : (rgb1[2] + (bDiff * percent))
+    let newRgb = `rgb(${rNew},${gNew},${bNew})`;
+    return newRgb;
 }
 
 function generatePoints() {
@@ -54,7 +67,7 @@ function connectPoints() {
                     let x2 = points[q].node.cx.animVal.value;
                     let y2 = points[q].node.cy.animVal.value
 
-                    const lineIndex = lines.push( newLine(x1, y1, x2, y2, inittedConnect ? 'white' : 'white') )
+                    const lineIndex = lines.push( newLine(x1, y1, x2, y2) )
 
                     const lineEl = lines[lineIndex-1];
                     const pointAnim = points[i].anims[Object.keys(points[i].anims)[0]]
@@ -102,7 +115,6 @@ function connectPoints() {
             }
         }
     }
-    inittedConnect = true;
 }
 
 function calculateDistance(x1, y1, x2, y2) {
